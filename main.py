@@ -3,8 +3,62 @@ import random
 from pygame import Vector2, Rect, Color, Surface
 from button import Button
 from menu import MainMenu
+import utils as ut
 import os
 
+
+class Button:
+
+    color_normal = Color(158,214,12)
+    color_on_hover = Color(96,133,0)
+
+    def __init__(self, parent_pos: Vector2, onclick_function, text):
+        self.width = cell_size * 3
+        self.height = cell_size * 1
+        self.pos = parent_pos
+        self.button_rect = Rect(self.pos.x, self.pos.y, self.width, self.height)
+        self.button_color = self.color_normal
+        self.onclick_fun = onclick_function
+        self.text = text
+
+    def draw_button(self):
+        pygame.draw.rect(screen, self.button_color, self.button_rect)
+        text_surf = button_font.render(self.text, True, TEXT_COLOR)
+        center = (self.pos.x + self.width/2, self.pos.y + self.height/2)
+        text_box = text_surf.get_rect(center=center)
+        screen.blit(text_surf, text_box)
+
+    def on_click(self):
+        self.onclick_fun()
+
+class GameOverMenu:
+    def __init__(self, restart_fun):
+        self.width = cell_size * 7
+        self.height = cell_size * 10
+        self.pos = Vector2(cell_num/2 * cell_size - self.width/2, (cell_num + 2)/2 * cell_size - cell_size/2 - (cell_size * 8)/2)
+        self.bck_color = Color(8,144,121) 
+        self.background_rect = Rect(self.pos.x, self.pos.y , self.width, self.height)
+        self.button = Button(self.pos + Vector2(cell_size * 2, cell_size * 2), restart_fun, "Restart") # Restart button
+        
+    def draw_menu(self):
+        self.on_hover()
+        pygame.draw.rect(screen, self.bck_color, self.background_rect)
+        self.button.draw_button()
+
+    def on_hover(self):
+        # Check on hover buttons
+        mouse_pos = Vector2(pygame.mouse.get_pos())
+        if self.button.pos.x <= mouse_pos.x <= self.button.pos.x + self.button.width \
+                and self.button.pos.y <= mouse_pos.y <= self.button.pos.y + self.button.height:
+            self.button.button_color = self.button.color_on_hover
+        else:
+            self.button.button_color = self.button.color_normal
+
+    def check_click(self, mouse_pos: Vector2):
+        if self.button.pos.x <= mouse_pos.x <= self.button.pos.x + self.button.width \
+                and self.button.pos.y <= mouse_pos.y <= self.button.pos.y + self.button.height:
+            self.button.on_click()
+        
 class Snake:
     def __init__(self):
         self.body = [Vector2(7,6), Vector2(6,6), Vector2(5,6)]
@@ -120,7 +174,8 @@ class Fruit:
         self.sprite = pygame.image.load(os.path.join(IMGDIR, 'apple.png')) 
 
     def draw_fruit(self):
-        fruit_rect = Rect(int(self.pos.x * cell_size), int(self.pos.y * cell_size), cell_size, cell_size)
+        pos_y = ut.draw_bounce(5,1,int(self.pos.y * cell_size))
+        fruit_rect = Rect(int(self.pos.x * cell_size), pos_y, cell_size, cell_size)
         screen.blit(self.sprite, fruit_rect)
 
     def randomize(self):
@@ -132,6 +187,7 @@ class Main:
     def __init__(self):
         self.snake = Snake()
         self.fruit = Fruit()
+        self.game_over_menu = GameOverMenu(self.restart_game)
         self.score = 3
         self.state = 1
 
@@ -142,9 +198,20 @@ class Main:
         self.snake.move_snake(direction)
 
     def draw_elements(self):
+        self.draw_background()
         self.fruit.draw_fruit()
         self.snake.draw_snake()
         self.draw_score()
+
+    def draw_background(self):
+        screen.fill(TERRAIN_COLOR_LIGHT)
+        for y in range(cell_num+2):
+            for x in range(cell_num):
+                if (x + y) % 2: # Only odd positions
+                    pos = Vector2(x, y)
+                    terrain_block = Rect(pos.x * cell_size, pos.y * cell_size, cell_size, cell_size)
+                    pygame.draw.rect(screen, TERRAIN_COLOR_DARK, terrain_block)
+
 
     def check_collision(self):
         if self.snake.body[0] == self.fruit.pos: # If the head touches the body
@@ -156,6 +223,8 @@ class Main:
         score_string = str(self.score)
         score_text = font.render(score_string, True, TEXT_COLOR)
         score_text_rect = score_text.get_rect(center=((3*cell_size)/2 + (pos_score_x), cell_size))
+        pygame.draw.rect(screen, BAR_COLOR, top_bar)  
+        pygame.draw.rect(screen, SCORE_BOX_COLOR, score_box, border_radius=15)
         screen.blit(score_text, score_text_rect)
 
     def game_over(self):
@@ -175,13 +244,9 @@ class Main:
     def draw_main_menu(self):
         screen.fill((124,124,124))
 
-    def draw_game_over(self):
-        width = cell_size * 7
-        height = cell_size * 10
-        x_pos_tile = cell_num/2 * cell_size - width/2
-        y_pos_tile = (cell_num + 2)/2 * cell_size - cell_size/2 - (cell_size * 8)/2 
-        game_over_tile = Rect(x_pos_tile, y_pos_tile , width, height)
-        pygame.draw.rect(screen, (0,0,0), game_over_tile)
+    def restart_game(self):
+        self.__init__()  
+        self.state = 1
 
 #Variables
 IMGDIR = 'snake/assets/'
@@ -196,12 +261,15 @@ dir = Vector2(1,0)
 SNAKE_COLOR = Color(73, 159, 104)
 FRUIT_COLOR = Color(219, 58, 52)
 BCG_COLOR = Color(87, 100, 144)
+TERRAIN_COLOR_DARK = Color(5, 126, 5)
+TERRAIN_COLOR_LIGHT = Color(20, 154, 20)
 BAR_COLOR = Color(191, 152, 160)
 SCORE_BOX_COLOR = Color(255,255,255)
 TEXT_COLOR = Color(0, 0, 0)
 
 pygame.init()
 font = pygame.font.SysFont('arial', 48, bold=True)
+button_font = pygame.font.SysFont('arial', 20, bold=False)
 pygame.display.set_caption('Snake')
 size = width, height = (int(cell_size * cell_num), int(cell_size * cell_num) + 2*cell_size)
 top_bar = pygame.Rect(0, 0, int(width), int(2 * cell_size))
@@ -211,7 +279,6 @@ screen = pygame.display.set_mode(size)
 clock = pygame.time.Clock()
 screen_update = pygame.USEREVENT
 pygame.time.set_timer(screen_update, game_time)
-
 main_game = Main()
 
 while running:
@@ -234,6 +301,12 @@ while running:
             if event.key == pygame.K_w:
                 dir = Vector2(0, -1)
 
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if main_game.state == 2: # If in the game over menu
+                main_game.game_over_menu.check_click(Vector2(event.pos))
+
+            
+
     if (dir == Vector2(1, 0) and main_game.snake.direction == Vector2(-1, 0)) \
             or (dir == Vector2(-1, 0) and main_game.snake.direction == Vector2(1, 0)) \
             or (dir == Vector2(0, 1) and main_game.snake.direction == Vector2(0, -1)) \
@@ -244,12 +317,9 @@ while running:
     if main_game.state == 0: # Main menu
         main_game.draw_main_menu()
     elif main_game.state == 1: # Main game
-        screen.fill(BCG_COLOR)
-        pygame.draw.rect(screen, BAR_COLOR, top_bar)  
-        pygame.draw.rect(screen, SCORE_BOX_COLOR, score_box, border_radius=15)
         main_game.draw_elements()    
     elif main_game.state == 2: #Game over
-        main_game.draw_game_over()
-
+        main_game.game_over_menu.draw_menu()
+        
     pygame.display.flip()
-    clock.tick(60) #Max 60fps
+    clock.tick(100) #Max 100fps
