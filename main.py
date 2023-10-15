@@ -31,6 +31,15 @@ class Button:
     def on_click(self):
         self.onclick_fun()
 
+    def on_hover(self):
+        mouse_pos = Vector2(pygame.mouse.get_pos())
+        if self.pos.x <= mouse_pos.x <= self.pos.x + self.width \
+                and self.pos.y <= mouse_pos.y <= self.pos.y + self.height:
+            self.button_color = self.color_on_hover
+        else:
+            self.button_color = self.color_normal
+
+
 class GameOverMenu:
     def __init__(self, restart_fun):
         self.width = cell_size * 7
@@ -42,8 +51,15 @@ class GameOverMenu:
         
     def draw_menu(self):
         self.on_hover()
+        self.draw_game_over()
         pygame.draw.rect(screen, self.bck_color, self.background_rect)
         self.button.draw_button()
+
+    def draw_game_over(self):
+        title_text = main_title_font.render("Game Over", True, TEXT_COLOR)
+        center = ( cell_num * cell_size / 2, 5 * cell_size /2)
+        title_box = title_text.get_rect(center=center)
+        screen.blit(title_text, title_box)  
 
     def on_hover(self):
         # Check on hover buttons
@@ -58,7 +74,40 @@ class GameOverMenu:
         if self.button.pos.x <= mouse_pos.x <= self.button.pos.x + self.button.width \
                 and self.button.pos.y <= mouse_pos.y <= self.button.pos.y + self.button.height:
             self.button.on_click()
-        
+
+class MainMenu:
+    def __init__(self, button_fun, quit_fun):
+        self.width = cell_size * 7
+        self.height = cell_size * 10
+        self.pos = Vector2(cell_num/2 * cell_size - self.width/2, (cell_num + 2)/2 * cell_size - cell_size/2 - (cell_size * 8)/2)
+        self.bck_color = Color(8,144,121) 
+        self.background_rect = Rect(self.pos.x, self.pos.y , self.width, self.height)
+        self.button = Button(self.pos + Vector2(cell_size * 2, cell_size * 2), button_fun, "Start Game") # Start button 
+        self.button_quit = Button(self.pos + Vector2(cell_size * 2, cell_size * 4), quit_fun, "Quit Game")
+
+    def draw_menu(self):
+        self.draw_main_title()
+        self.button.on_hover()
+        self.button_quit.on_hover()
+        pygame.draw.rect(screen, self.bck_color, self.background_rect)
+        self.button.draw_button()
+        self.button_quit.draw_button()
+
+    def draw_main_title(self):
+        title_text = main_title_font.render("Snake", True, TEXT_COLOR)
+        center = ( cell_num * cell_size / 2, 5 * cell_size /2)
+        title_box = title_text.get_rect(center=center)
+        screen.blit(title_text, title_box)  
+
+    def check_click(self, mouse_pos: Vector2):
+        if self.button.pos.x <= mouse_pos.x <= self.button.pos.x + self.button.width \
+                and self.button.pos.y <= mouse_pos.y <= self.button.pos.y + self.button.height:
+            self.button.on_click()
+
+        if self.button_quit.pos.x <= mouse_pos.x <= self.button_quit.pos.x + self.button_quit.width \
+                and self.button_quit.pos.y <= mouse_pos.y <= self.button_quit.pos.y + self.button_quit.height:
+            self.button_quit.on_click()
+
 class Snake:
     def __init__(self):
         self.body = [Vector2(7,6), Vector2(6,6), Vector2(5,6)]
@@ -188,8 +237,9 @@ class Main:
         self.snake = Snake()
         self.fruit = Fruit()
         self.game_over_menu = GameOverMenu(self.restart_game)
+        self.main_menu = MainMenu(self.start_game, self.quit_game)
         self.score = 3
-        self.state = 1
+        self.state = 0
 
     def update(self, direction): #Check if the new direction is allowed
         self.check_collision()
@@ -248,8 +298,18 @@ class Main:
         self.__init__()  
         self.state = 1
 
+    def start_game(self):
+        self.__init__()
+        pygame.time.set_timer(screen_update, game_time)
+        self.state = 1
+
+    def quit_game(self):
+        pygame.quit()
+        
+
 #Variables
 IMGDIR = 'snake/assets/'
+FONTDIR = 'snake/font/'
 cell_size = 40
 cell_num = 15 
 game_time = 150 #150ms
@@ -270,6 +330,7 @@ TEXT_COLOR = Color(0, 0, 0)
 pygame.init()
 font = pygame.font.SysFont('arial', 48, bold=True)
 button_font = pygame.font.SysFont('arial', 20, bold=False)
+main_title_font = pygame.font.Font(os.path.join(FONTDIR, 'Snake Chan.ttf'), 68)
 pygame.display.set_caption('Snake')
 size = width, height = (int(cell_size * cell_num), int(cell_size * cell_num) + 2*cell_size)
 top_bar = pygame.Rect(0, 0, int(width), int(2 * cell_size))
@@ -278,7 +339,6 @@ score_box = pygame.Rect(pos_score_x, pos_score_y + 5, 3 * cell_size, 2 * cell_si
 screen = pygame.display.set_mode(size)
 clock = pygame.time.Clock()
 screen_update = pygame.USEREVENT
-pygame.time.set_timer(screen_update, game_time)
 main_game = Main()
 
 while running:
@@ -304,6 +364,9 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if main_game.state == 2: # If in the game over menu
                 main_game.game_over_menu.check_click(Vector2(event.pos))
+            
+            if main_game.state == 0: # If the game is in main menu
+                main_game.main_menu.check_click(Vector2(event.pos))
 
             
 
@@ -315,7 +378,8 @@ while running:
 
     # Game handler
     if main_game.state == 0: # Main menu
-        main_game.draw_main_menu()
+        main_game.draw_background()
+        main_game.main_menu.draw_menu()
     elif main_game.state == 1: # Main game
         main_game.draw_elements()    
     elif main_game.state == 2: #Game over
